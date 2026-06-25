@@ -14,3 +14,13 @@ public/uploads/
 .DS_Store
 Thumbs.db
 .vscode/
+
+# DevOps files (hidden for now, kept locally)
+docker-compose.yml
+**/Dockerfile
+.dockerignore
+.github/
+
+# Test images (throwaway)
+corrupt.jpg
+sample.jpg
