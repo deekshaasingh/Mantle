@@ -1,34 +1,7 @@
-<<<<<<< HEAD
 node_modules/
-uploads/
-processed/
-input.jpg
-output.jpg
-=======
-# Dependencies
-node_modules/
-
-# Uploaded and processed media (runtime artifacts, not source)
-public/uploads/
-
-# Logs
-*.log
-
-# Environment files
-.env
-
-# OS / editor noise
-.DS_Store
-Thumbs.db
-.vscode/
-
-# DevOps files (hidden for now, kept locally)
-docker-compose.yml
-**/Dockerfile
-.dockerignore
-.github/
-
-# Test images (throwaway)
-corrupt.jpg
-sample.jpg
->>>>>>> 6f1e4218cd1360cda28be950b9db368a4739eb21
+**/node_modules/
+backend/uploads/
+backend/processed/
+backend/input.jpg
+.next/
+**/.next/

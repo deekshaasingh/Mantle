@@ -22,11 +22,18 @@ function fmtBytes(b: number) {
   return `${(b / 1024 / 1024).toFixed(2)} MB`;
 }
 
+const TRANSFORMS = [
+  { id: "grayscale", label: "Grayscale" },
+  { id: "blur", label: "Blur" },
+  { id: "rotate", label: "Rotate 90°" },
+];
+
 export default function Home() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [history, setHistory] = useState<any[]>([]);
   const [format, setFormat] = useState("webp");
   const [quality, setQuality] = useState(80);
+  const [transforms, setTransforms] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const pollers = useRef<Record<string, any>>({});
 
@@ -41,6 +48,10 @@ export default function Home() {
     loadHistory();
     return () => Object.values(pollers.current).forEach(clearInterval);
   }, []);
+
+  function toggleTransform(id: string) {
+    setTransforms((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]));
+  }
 
   function updateJob(localId: string, patch: Partial<Job>) {
     setJobs((prev) => prev.map((j) => (j.localId === localId ? { ...j, ...patch } : j)));
@@ -57,8 +68,6 @@ export default function Home() {
     }));
 
     setJobs((prev) => [...newJobs, ...prev]);
-
-    // Fire an independent upload for each file
     newJobs.forEach((job, i) => uploadOne(job, files[i]));
   }
 
@@ -67,6 +76,7 @@ export default function Home() {
     fd.append("image", file);
     fd.append("format", format);
     fd.append("quality", String(quality));
+    fd.append("transforms", transforms.join(","));
 
     try {
       const res = await fetch(`${API}/upload`, { method: "POST", body: fd });
@@ -135,6 +145,16 @@ export default function Home() {
                 <span className="opt-label">Quality <span className="q-val">{quality}</span></span>
                 <input type="range" min={10} max={100} value={quality} onChange={(e) => setQuality(Number(e.target.value))} className="range" />
               </div>
+              <div className="opt">
+                <span className="opt-label">Transforms</span>
+                <div className="chips">
+                  {TRANSFORMS.map((t) => (
+                    <button key={t.id} className={`chip ${transforms.includes(t.id) ? "active" : ""}`} onClick={() => toggleTransform(t.id)}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <button className="drop" onClick={() => inputRef.current?.click()}>
@@ -143,14 +163,7 @@ export default function Home() {
               <span className="hint">select one or many — JPG or PNG</span>
             </button>
 
-            <input
-              ref={inputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              hidden
-              onChange={(e) => onPick(e.target.files)}
-            />
+            <input ref={inputRef} type="file" accept="image/*" multiple hidden onChange={(e) => onPick(e.target.files)} />
           </div>
         </section>
 
@@ -176,6 +189,7 @@ export default function Home() {
                     </div>
                     {job.status === "done" && job.result ? (
                       <div className="job-stats">
+                        <span>{job.result.width}×{job.result.height}</span>
                         <span>{fmtBytes(job.result.originalSize)} → {fmtBytes(job.result.processedSize)}</span>
                         <span className="accent">{job.result.savedPercent}% smaller</span>
                         <span className="muted">{job.result.processingMs}ms</span>
@@ -219,50 +233,28 @@ export default function Home() {
       </div>
 
       <style jsx>{`
-        .page {
-          min-height: 100vh; background: #0b0e14; color: #e8ecf4;
-          font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
-          position: relative; overflow-x: hidden;
-          display: flex; align-items: flex-start; justify-content: center;
-          padding: 64px 24px 80px;
-        }
-        .depth {
-          position: fixed; inset: 0;
-          background: radial-gradient(120% 80% at 50% 120%, rgba(255,107,53,0.18), rgba(226,62,87,0.06) 40%, transparent 70%);
-          pointer-events: none;
-        }
+        .page { min-height: 100vh; background: #0b0e14; color: #e8ecf4; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; position: relative; overflow-x: hidden; display: flex; align-items: flex-start; justify-content: center; padding: 64px 24px 80px; }
+        .depth { position: fixed; inset: 0; background: radial-gradient(120% 80% at 50% 120%, rgba(255,107,53,0.18), rgba(226,62,87,0.06) 40%, transparent 70%); pointer-events: none; }
         .wrap { position: relative; width: 100%; max-width: 560px; }
         .head { text-align: center; margin-bottom: 40px; }
         .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #4ecdc4; box-shadow: 0 0 16px #4ecdc4; margin-bottom: 20px; }
-        .logo {
-          font-size: 64px; font-weight: 800; letter-spacing: 0.16em; margin: 0; line-height: 1;
-          background: linear-gradient(180deg, #fff, #7a8295);
-          -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        }
+        .logo { font-size: 64px; font-weight: 800; letter-spacing: 0.16em; margin: 0; line-height: 1; background: linear-gradient(180deg, #fff, #7a8295); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .tag { color: #ff6b35; font-size: 13px; margin: 16px 0 0; text-transform: uppercase; letter-spacing: 0.22em; font-weight: 600; }
         .sub { color: #6b7280; font-size: 14px; margin: 10px auto 0; max-width: 400px; line-height: 1.5; }
-        .card {
-          position: relative; border-radius: 20px; overflow: hidden;
-          background: rgba(20,25,37,0.7); border: 1px solid rgba(255,255,255,0.08);
-          backdrop-filter: blur(20px); box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-        }
+        .card { position: relative; border-radius: 20px; overflow: hidden; background: rgba(20,25,37,0.7); border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(20px); box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
         .card-inner { position: relative; padding: 28px; }
         .options { display: flex; flex-direction: column; gap: 18px; margin-bottom: 22px; }
         .opt { display: flex; flex-direction: column; gap: 10px; }
         .opt-label { font-size: 12px; color: #8b93a7; text-transform: uppercase; letter-spacing: 0.08em; }
         .q-val { color: #ff6b35; margin-left: 6px; font-family: ui-monospace, monospace; }
         .segmented { display: flex; gap: 6px; }
-        .seg {
-          flex: 1; padding: 10px; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 600;
-          background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #8b93a7; transition: all 0.2s;
-        }
+        .seg { flex: 1; padding: 10px; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 600; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #8b93a7; transition: all 0.2s; }
         .seg.active { background: rgba(255,107,53,0.15); border-color: rgba(255,107,53,0.5); color: #ff6b35; }
         .range { width: 100%; accent-color: #ff6b35; }
-        .drop {
-          width: 100%; border: 1.5px dashed rgba(255,255,255,0.15); background: transparent;
-          color: #e8ecf4; border-radius: 14px; padding: 48px 20px; cursor: pointer;
-          display: flex; flex-direction: column; align-items: center; gap: 8px; transition: border-color 0.2s, background 0.2s;
-        }
+        .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+        .chip { padding: 8px 14px; border-radius: 20px; cursor: pointer; font-size: 12px; font-weight: 600; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #8b93a7; transition: all 0.2s; }
+        .chip.active { background: rgba(78,205,196,0.15); border-color: rgba(78,205,196,0.5); color: #4ecdc4; }
+        .drop { width: 100%; border: 1.5px dashed rgba(255,255,255,0.15); background: transparent; color: #e8ecf4; border-radius: 14px; padding: 48px 20px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 8px; transition: border-color 0.2s, background 0.2s; }
         .drop:hover { border-color: rgba(255,107,53,0.5); background: rgba(255,107,53,0.04); }
         .plus { font-size: 36px; color: #ff6b35; line-height: 1; }
         .drop-main { font-size: 16px; font-weight: 600; }
@@ -277,15 +269,8 @@ export default function Home() {
         .proc-count { color: #ff6b35; font-weight: 400; }
         .clear { background: none; border: none; color: #6b7280; cursor: pointer; font-size: 12px; text-decoration: underline; }
         .jobs { display: flex; flex-direction: column; gap: 10px; }
-        .job {
-          position: relative; display: flex; gap: 14px; align-items: center; padding: 12px;
-          background: rgba(20,25,37,0.7); border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 14px; overflow: hidden;
-        }
-        .job-molten {
-          position: absolute; inset: 0; opacity: 0; transition: opacity 0.5s;
-          background: linear-gradient(120deg, #ff6b35, #e23e57, #ff6b35); background-size: 200% 200%; filter: blur(36px);
-        }
+        .job { position: relative; display: flex; gap: 14px; align-items: center; padding: 12px; background: rgba(20,25,37,0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; overflow: hidden; }
+        .job-molten { position: absolute; inset: 0; opacity: 0; transition: opacity 0.5s; background: linear-gradient(120deg, #ff6b35, #e23e57, #ff6b35); background-size: 200% 200%; filter: blur(36px); }
         .job.processing .job-molten { opacity: 0.3; animation: churn 3s ease infinite; }
         @keyframes churn { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
         .job-thumb { position: relative; width: 56px; height: 56px; object-fit: cover; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; }
