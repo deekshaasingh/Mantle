@@ -5,3 +5,6 @@ backend/processed/
 backend/input.jpg
 .next/
 **/.next/
+.env
+**/.env
+backend/.env
