@@ -20,30 +20,43 @@ app.post("/upload", upload.single("image"), async (req, res) => {
   const inputPath = req.file.path;
   const format = ["jpg", "png", "webp"].includes(req.body.format) ? req.body.format : "jpg";
   const quality = Math.min(100, Math.max(10, parseInt(req.body.quality) || 80));
+  // transforms arrive as a comma-separated string e.g. "grayscale,blur"
+  const transforms = (req.body.transforms || "").split(",").filter(Boolean);
 
   const record = await Upload.create({
     originalFile: inputPath,
     format,
     quality,
+    transforms,
     originalSize: req.file.size,
     status: "processing",
   });
 
   res.status(202).json({ id: record._id, status: "processing" });
 
-  processInBackground(record._id, inputPath, req.file.filename, format, quality);
+  processInBackground(record._id, inputPath, req.file.filename, format, quality, transforms);
 });
 
-async function processInBackground(id, inputPath, filename, format, quality) {
+async function processInBackground(id, inputPath, filename, format, quality, transforms) {
   const start = Date.now();
   try {
+    // Read EXIF / image metadata up front
+    const meta = await sharp(inputPath).metadata();
+
     const sizes = { thumbnail: 200, desktop: 1280 };
     const processedFiles = {};
     let processedSize = 0;
 
     for (const [label, width] of Object.entries(sizes)) {
       const outputPath = `processed/${filename}-${label}.${format}`;
-      let pipeline = sharp(inputPath).resize({ width });
+      let pipeline = sharp(inputPath).rotate(); // auto-orient from EXIF
+
+      // optional transforms, applied before resize
+      if (transforms.includes("grayscale")) pipeline = pipeline.grayscale();
+      if (transforms.includes("blur")) pipeline = pipeline.blur(8);
+      if (transforms.includes("rotate")) pipeline = pipeline.rotate(90);
+
+      pipeline = pipeline.resize({ width });
 
       if (format === "jpg") pipeline = pipeline.jpeg({ quality });
       else if (format === "png") pipeline = pipeline.png({ quality });
@@ -67,6 +80,8 @@ async function processInBackground(id, inputPath, filename, format, quality) {
         processedSize,
         savedPercent,
         processingMs: Date.now() - start,
+        width: meta.width || 0,
+        height: meta.height || 0,
       }
     );
     console.log(`Task ${id} done in ${Date.now() - start}ms`);

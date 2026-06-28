@@ -2,14 +2,17 @@ const mongoose = require("mongoose");
 
 // The "shape" of one upload record
 const uploadSchema = new mongoose.Schema({
-  status: { type: String, default: "processing" }, // processing -> done -> failed
+  status: { type: String, default: "processing" },
   originalFile: String,
   format: { type: String, default: "jpg" },
   quality: { type: Number, default: 80 },
-  originalSize: { type: Number, default: 0 },     // bytes
-  processedSize: { type: Number, default: 0 },    // bytes (sum of outputs)
+  originalSize: { type: Number, default: 0 },
+  processedSize: { type: Number, default: 0 },
   savedPercent: { type: Number, default: 0 },
   processingMs: { type: Number, default: 0 },
+  width: { type: Number, default: 0 },
+  height: { type: Number, default: 0 },
+  transforms: { type: [String], default: [] },
   processedFiles: {
     thumbnail: { type: String, default: null },
     desktop: { type: String, default: null },
