@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const mongoose = require("mongoose");
 
 // The "shape" of one upload record
@@ -25,9 +27,11 @@ const uploadSchema = new mongoose.Schema({
 const Upload = mongoose.model("Upload", uploadSchema);
 
 // Connect to the MongoDB running on your machine
-async function connectDB() {
-  await mongoose.connect("mongodb://127.0.0.1:27017/mantle");
+async function connectDB(uri) {
+  const target = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/mantle";
+  await mongoose.connect(target);
   console.log("Connected to MongoDB");
+  return mongoose.connection;
 }
 
 module.exports = { connectDB, Upload };
