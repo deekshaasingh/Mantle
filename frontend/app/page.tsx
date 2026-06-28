@@ -193,7 +193,7 @@ export default function Home() {
                         <span>{fmtBytes(job.result.originalSize)} → {fmtBytes(job.result.processedSize)}</span>
                         <span className="accent">{job.result.savedPercent}% smaller</span>
                         <span className="muted">{job.result.processingMs}ms</span>
-                        <a className="dl-link" href={`${API}/${job.result.processedFiles.desktop}`} target="_blank" rel="noreferrer" download>download</a>
+                        <a className="dl-link" href={job.result.processedFiles.desktop} target="_blank" rel="noreferrer" download>download</a>
                       </div>
                     ) : job.status === "failed" ? (
                       <span className="job-err">processing failed</span>
@@ -217,8 +217,8 @@ export default function Home() {
               {history.map((item) => (
                 <div className="cell" key={item._id}>
                   {item.processedFiles?.thumbnail ? (
-                    <a href={`${API}/${item.processedFiles.thumbnail}`} target="_blank" rel="noreferrer" className="cell-link">
-                      <img src={`${API}/${item.processedFiles.thumbnail}`} alt="" className="cell-img" />
+                    <a href={item.processedFiles.thumbnail} target="_blank" rel="noreferrer" className="cell-link">
+                      <img src={item.processedFiles.thumbnail} alt="" className="cell-img" />
                     </a>
                   ) : (
                     <div className="cell-img placeholder"><span className="ph-icon">⌗</span></div>

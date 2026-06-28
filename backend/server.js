@@ -1,26 +1,42 @@
+require("dotenv").config();
 const fs = require("fs");
 fs.mkdirSync("uploads", { recursive: true });
-fs.mkdirSync("processed", { recursive: true });
 
 const cors = require("cors");
 const express = require("express");
 const multer = require("multer");
 const sharp = require("sharp");
+const cloudinary = require("cloudinary").v2;
 const { connectDB, Upload } = require("./db");
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 const app = express();
 app.use(cors());
-app.use("/processed", express.static("processed"));
 
 const upload = multer({ dest: "uploads/" });
 
 connectDB();
 
+// Helper: upload an in-memory image buffer to Cloudinary, return its URL
+function uploadToCloudinary(buffer, publicId) {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { public_id: publicId, folder: "mantle", resource_type: "image" },
+      (err, result) => (err ? reject(err) : resolve(result.secure_url))
+    );
+    stream.end(buffer);
+  });
+}
+
 app.post("/upload", upload.single("image"), async (req, res) => {
   const inputPath = req.file.path;
   const format = ["jpg", "png", "webp"].includes(req.body.format) ? req.body.format : "jpg";
   const quality = Math.min(100, Math.max(10, parseInt(req.body.quality) || 80));
-  // transforms arrive as a comma-separated string e.g. "grayscale,blur"
   const transforms = (req.body.transforms || "").split(",").filter(Boolean);
 
   const record = await Upload.create({
@@ -40,7 +56,6 @@ app.post("/upload", upload.single("image"), async (req, res) => {
 async function processInBackground(id, inputPath, filename, format, quality, transforms) {
   const start = Date.now();
   try {
-    // Read EXIF / image metadata up front
     const meta = await sharp(inputPath).metadata();
 
     const sizes = { thumbnail: 200, desktop: 1280 };
@@ -48,10 +63,8 @@ async function processInBackground(id, inputPath, filename, format, quality, tra
     let processedSize = 0;
 
     for (const [label, width] of Object.entries(sizes)) {
-      const outputPath = `processed/${filename}-${label}.${format}`;
-      let pipeline = sharp(inputPath).rotate(); // auto-orient from EXIF
+      let pipeline = sharp(inputPath).rotate();
 
-      // optional transforms, applied before resize
       if (transforms.includes("grayscale")) pipeline = pipeline.grayscale();
       if (transforms.includes("blur")) pipeline = pipeline.blur(8);
       if (transforms.includes("rotate")) pipeline = pipeline.rotate(90);
@@ -62,10 +75,15 @@ async function processInBackground(id, inputPath, filename, format, quality, tra
       else if (format === "png") pipeline = pipeline.png({ quality });
       else if (format === "webp") pipeline = pipeline.webp({ quality });
 
-      const info = await pipeline.toFile(outputPath);
-      processedFiles[label] = outputPath;
-      processedSize += info.size;
+      // produce the image in memory, then upload to Cloudinary
+      const buffer = await pipeline.toBuffer();
+      processedSize += buffer.length;
+      const url = await uploadToCloudinary(buffer, `${filename}-${label}`);
+      processedFiles[label] = url;
     }
+
+    // remove the temporary uploaded original
+    fs.unlink(inputPath, () => {});
 
     const record = await Upload.findById(id);
     const savedPercent = record.originalSize
