@@ -105,7 +105,7 @@ async function processInBackground(id, inputPath, filename, format, quality, tra
     console.log(`Task ${id} done in ${Date.now() - start}ms`);
   } catch (err) {
     await Upload.updateOne({ _id: id }, { status: "failed", error: err.message });
-    console.log(`Task ${id} failed: ${err.message}`);
+    console.log(`Task ${id} failed:`, err);
   }
 }
 
